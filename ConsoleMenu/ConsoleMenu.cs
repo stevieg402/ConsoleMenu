@@ -27,16 +27,16 @@
 
             this.consoleMenuItems.Add(
                 ConsoleMenuReservedCommands.DisplayCommand,
-                new ConsoleMenuItem(ConsoleMenuReservedCommands.DisplayCommand, "Display menu", () => this.Display()));
+                new ConsoleMenuItem(ConsoleMenuReservedCommands.DisplayCommand, "Display menu", x => this.Display()));
             this.consoleMenuItems.Add(
                 ConsoleMenuReservedCommands.ClearScreenCommand,
                 new ConsoleMenuItem(
                     ConsoleMenuReservedCommands.ClearScreenCommand,
                     "Clear screen",
-                    () => this.ClearScreen()));
+                    x => this.ClearScreen()));
             this.consoleMenuItems.Add(
                 ConsoleMenuReservedCommands.ExitCommand,
-                new ConsoleMenuItem(ConsoleMenuReservedCommands.ExitCommand, "Exit", () => { this.Finished = true; }));
+                new ConsoleMenuItem(ConsoleMenuReservedCommands.ExitCommand, "Exit", x => { this.Finished = true; }));
         }
 
         private bool Finished { get; set; }
@@ -65,22 +65,57 @@
             }
         }
 
+        private ConsoleMenuItem GetConsoleMenuItem(string command)
+        {
+            if (this.consoleMenuItems.ContainsKey(command))
+            {
+                return this.consoleMenuItems[command];
+            }
+
+            return null;
+        }
+
         private void HandleCommand()
         {
             Console.WriteLine();
             Console.Write("Select a menu option: ");
-            var command = Console.ReadLine();
 
-            if (string.IsNullOrWhiteSpace(command))
+            var commandLine = Console.ReadLine();
+
+            var consoleCommand = new ConsoleCommand(commandLine);
+            if (consoleCommand.IsEmpty)
             {
                 Console.WriteLine("Please select a menu option.");
             }
             else
             {
-                var commandKey = command.ToLowerInvariant();
-                if (this.consoleMenuItems.ContainsKey(commandKey))
+                var consoleMenuItem = this.GetConsoleMenuItem(consoleCommand.Command);
+
+                if (consoleMenuItem != null)
                 {
-                    this.consoleMenuItems[commandKey].Callback();
+                    switch (consoleMenuItem.ValidateCommand(consoleCommand))
+                    {
+                        case ConsoleCommandValidationStatus.NotEnoughParameters:
+                            Console.WriteLine(
+                                $"The number of parameters supplied does not match the number of parameters expected.{Environment.NewLine}Use the help or ? parameter to get help on the command.");
+                            break;
+                        case ConsoleCommandValidationStatus.ShowHelpText:
+                            Console.WriteLine(consoleMenuItem.HelpText);
+                            break;
+                        case ConsoleCommandValidationStatus.Ok:
+                            try
+                            {
+                                this.consoleMenuItems[consoleCommand.Command].Callback(consoleCommand.Parameters);
+                            }
+                            catch (Exception e)
+                            {
+                                Console.WriteLine("An error occurred whilst processing your command:");
+                                Console.WriteLine(e.Message);
+                            }
+                            break;
+                        default:
+                            throw new ArgumentOutOfRangeException();
+                    }
                 }
                 else
                 {
